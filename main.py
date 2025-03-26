@@ -88,7 +88,7 @@ def scan_file():
     if not check_login_required():
         return
     file_path = filedialog.askopenfilename()
-    is_malware = detect_malware(decrypt_file(file_path))
+    is_malware = detect_malware(decrypt_file (logged_in_user, file_path))
     if is_malware:
         messagebox.showerror("Threat Detected", f"Malware detected in file: {file_path}")
         log_threat(file_path, "Malware detected")
