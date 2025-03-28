@@ -2,6 +2,7 @@ import bcrypt
 import hashlib
 import smtplib
 import base64
+import json
 from tkinter import messagebox
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -12,18 +13,52 @@ import time
 # Store static OTPs and their expiration times
 static_otps = {}
 
+# File to store users persistently
+USERS_FILE = "users.json"
+
 # Helper function to hash passwords
 def hash_password(password):
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(10))
 
-# Example user with a hashed password
-password_hash = hash_password("123")
-users = {
-    "user": {
-        "password": password_hash,
-        "secret_key": "nmgWMPkXMnRFGY6sHqShTFeiCSg5x7VMCKjVmcDFLIk=",
-    },
-}
+# Load users from file
+def load_users():
+    global users
+    try:
+        with open(USERS_FILE, 'r') as f:
+            loaded_users = json.load(f)
+            # Convert hex/base64 strings back to bytes where necessary
+            users = {}
+            for username, data in loaded_users.items():
+                users[username] = {
+                    "password": bytes.fromhex(data["password"]),  # Stored as hex
+                    "secret_key": data["secret_key"]  # Already a base64 string
+                }
+    except FileNotFoundError:
+        # Default user if file doesn't exist
+        password_hash = hash_password("123")
+        users = {
+            "user": {
+                "password": password_hash,
+                "secret_key": "nmgWMPkXMnRFGY6sHqShTFeiCSg5x7VMCKjVmcDFLIk=",
+            },
+        }
+        save_users()  # Save initial state
+
+# Save users to file
+def save_users():
+    # Convert bytes to hex/base64 for JSON serialization
+    serializable_users = {}
+    for username, data in users.items():
+        serializable_users[username] = {
+            "password": data["password"].hex(),  # Convert bytes to hex
+            "secret_key": data["secret_key"]  # Already a base64 string
+        }
+    with open(USERS_FILE, 'w') as f:
+        json.dump(serializable_users, f)
+
+# Load users at module initialization
+users = {}
+load_users()
 
 # Helper function to verify hashed passwords
 def verify_password(password, hashed):
@@ -46,10 +81,13 @@ def register_user(username, password):
         "password": hashed_password,
         "secret_key": secret_key.decode('utf-8'),
     }
+    save_users()  # Persist changes
     print(f"Generated secret key for {username}: {secret_key.decode('utf-8')}")
     return "User registered successfully."
 
 # Function to generate a static OTP
+# We are generating static random otp just for demonstration, otherwise we know that python libraries for time based otp
+# such as pyotp exists which are more secure. We can easily swap out otp generation using such advanced libraries easily as our code is modular
 def generate_static_otp(username, validity=300):
     """Generate a static OTP valid for a specific duration (default: 300 seconds)."""
     if username not in users:
@@ -58,11 +96,11 @@ def generate_static_otp(username, validity=300):
     otp = ''.join(random.choices(string.digits, k=6))  # Generate a 6-digit OTP
     expiration_time = time.time() + validity
     static_otps[username] = {"otp": otp, "expires_at": expiration_time}
-    user_email = "user-email"
+    user_email = "user-email@example.com"  # Replace with actual email logic if needed
     try:
         # SMTP Configuration
-        sender_email = "sender-email"
-        sender_password = ""
+        sender_email = "sender-email@example.com"
+        sender_password = ""  # Replace with your 16-digit app password
         smtp_server = "smtp.gmail.com"
         smtp_port = 587
 
@@ -104,7 +142,7 @@ def validate_static_otp(username, otp):
         return True
     return False
 
-# Updated authentication to support both static and time-based OTPs
+# Updated authentication to support static OTPs
 def authenticate_user(username, password, otp):
     if username not in users:
         return False
