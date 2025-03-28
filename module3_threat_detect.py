@@ -16,9 +16,7 @@ def calculate_file_hash(file_path):
         return None, str(e)
     return hash_md5.hexdigest(), None
 
-
 def detect_malware(file_content):
-
     file_hash = hashlib.md5(file_content.encode('utf-8')).hexdigest()
     if file_hash in KNOWN_MALICIOUS_HASHES:
         with open("threat_log.txt", "a") as log_file:
@@ -33,6 +31,14 @@ def validate_input(input_data):
     patterns = [
         r"(?:\x90{3,})",  # NOP sleds
         r"(?:A{5,})",     # Long sequence of 'A's
+
+        # ** Other such common patterns **
+        # r"(?:[\x00-\x1F]{5,})",  # Repeated control characters: Often used in exploits
+        # r"(?:\xCC{3,})",         # INT3 breakpoints: Debug interrupt instructions
+        # r"(?:%(?:[0-9A-Fa-f]{2}){5,})",  # Repeated hex-encoded bytes (e.g., %41%41%41): URL-encoded overflow
+        # r"(?:\xEB.{1,10}\xEB)",  # Short JMP instructions: Used to redirect execution
+        # r"(?:[ -~]{100,})"       # Excessive printable ASCII: Unnaturally long strings
+        # **                            **
     ]
     for pattern in patterns:
         if re.search(pattern, input_data):
